@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Sonar Bangla Open World 3D</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body, html { width: 100%; height: 100%; overflow: hidden; background: #0b131e; color: #fff; }
+        
+        /* UI Screens */
+        .screen { position: absolute; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 10; }
+        .hidden { display: none !important; }
+
+        /* Landing Screen */
+        #landing-screen { background: linear-gradient(135deg, #006a4e, #0b131e); text-align: center; padding: 20px; }
+        h1 { font-size: 2.5rem; color: #f2a900; margin-bottom: 10px; text-shadow: 2px 2px 4px rgba(0,0,0,0.6); }
+        p.subtitle { font-size: 1.1rem; margin-bottom: 30px; color: #e0e0e0; }
+        .btn-group { display: flex; gap: 15px; flex-wrap: wrap; justify-content: center; }
+        .btn { padding: 14px 28px; font-size: 1.1rem; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        .btn-main { background: #f2a900; color: #000; }
+        .btn-sub { background: #006a4e; border: 2px solid #f2a900; color: #fff; }
+        .btn:hover { transform: scale(1.05); }
+
+        /* Selection Screen */
+        #select-screen { background: #121c2b; padding: 20px; text-align: center; }
+        .card-container { display: flex; gap: 15px; margin: 25px 0; flex-wrap: wrap; justify-content: center; }
+        .card { background: #1e2c40; border: 2px solid #334763; border-radius: 10px; padding: 20px; width: 160px; cursor: pointer; transition: 0.3s; }
+        .card.selected { border-color: #f2a900; background: #263852; }
+        .card h3 { color: #f2a900; margin-bottom: 8px; font-size: 1.1rem; }
+        .card p { font-size: 0.85rem; color: #aaa; }
+
+        /* HUD & Controls Overlay */
+        #game-hud { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 5; pointer-events: none; }
+        .hud-top { position: absolute; top: 15px; left: 15px; display: flex; gap: 15px; background: rgba(0,0,0,0.6); padding: 10px 15px; border-radius: 8px; }
+        .hud-top div { font-size: 1rem; font-weight: bold; color: #f2a900; }
+        
+        /* MiniMap */
+        #minimap { position: absolute; top: 15px; right: 15px; width: 100px; height: 100px; border: 2px solid #f2a900; border-radius: 50%; background: rgba(0,106,78,0.7); overflow: hidden; }
+        #minimap-player { position: absolute; top: 48px; left: 48px; width: 6px; height: 6px; background: red; border-radius: 50%; }
+
+        /* On-Screen Touch Controls */
+        .controls-layer { position: absolute; bottom: 20px; width: 100%; display: flex; justify-content: space-between; padding: 0 30px; pointer-events: auto; }
+        .dpad { width: 120px; height: 120px; position: relative; }
+        .dpad-btn { position: absolute; width: 40px; height: 40px; background: rgba(255,255,255,0.2); border-radius: 8px; border: 1px solid #fff; display: flex; justify-content: center; align-items: center; font-weight: bold; color: #fff; }
+        .dpad-up { top: 0; left: 40px; }
+        .dpad-down { bottom: 0; left: 40px; }
+        .dpad-left { top: 40px; left: 0; }
+        .dpad-right { top: 40px; right: 0; }
+        .action-btns { display: flex; gap: 15px; align-items: flex-end; }
+        .act-btn { width: 60px; height: 60px; border-radius: 50%; background: rgba(242,169,0,0.8); border: 2px solid #fff; font-weight: bold; color: #000; display: flex; justify-content: center; align-items: center; }
+
+        /* Rotate Screen Suggestion */
+        #rotate-hint { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 20; color: #fff; justify-content: center; align-items: center; font-size: 1.2rem; }
+        @media (orientation: portrait) { #rotate-hint { display: flex; } }
+    </style>
+    <!-- Three.js for 3D graphics -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+
+    <!-- Landing Screen -->
+    <div id="landing-screen" class="screen">
+        <h1>সোনার বাংলা ৩ডি সিমুলেটর</h1>
+        <p class="subtitle">বাংলাদেশের ম্যাপে শূন্য থেকে কোটিপতি হওয়ার ওপেন-ওয়ার্ল্ড গেম</p>
+        <div class="btn-group">
+            <button class="btn btn-main" onclick="openSelection()">গেম টেস্ট / প্রিভিউ</button>
+            <button class="btn btn-sub" onclick="downloadApp()">ডাউনলোড অ্যাপ (PWA)</button>
+        </div>
+    </div>
+
+    <!-- Mode Selection Screen -->
+    <div id="select-screen" class="screen hidden">
+        <h2>আপনার লাইফ ট্র্যাক বেছে নিন</h2>
+        <div class="card-container">
+            <div class="card selected" onclick="selectTrack(this, 'business')">
+                <h3>বিজনেস</h3>
+                <p>ছোট দোকান থেকে শুরু করে বড় টাওয়ারের মালিক হন</p>
+            </div>
+            <div class="card" onclick="selectTrack(this, 'job')">
+                <h3>শপিং মল জব</h3>
+                <p>চাকরি করে টাকা জমান এবং ক্যারিয়ার বানান</p>
+            </div>
+            <div class="card" onclick="selectTrack(this, 'school')">
+                <h3>স্টুডেন্ট লাইফ</h3>
+                <p>পড়াশোনা শেষ করে স্কিল বাড়িয়ে বড় হন</p>
+            </div>
+        </div>
+        <button class="btn btn-main" onclick="startGame()">গেম শুরু করুন</button>
+    </div>
+
+    <!-- HUD Overlay -->
+    <div id="game-hud" class="hidden">
+        <div class="hud-top">
+            <div>টাকা: <span id="money-txt">১০</span> ৳</div>
+            <div>অবস্থান: <span id="loc-txt">ঢাকা সিটি</span></div>
+        </div>
+        <div id="minimap">
+            <div id="minimap-player"></div>
+        </div>
+        
+        <div class="controls-layer">
+            <div class="dpad">
+                <div class="dpad-btn dpad-up" id="btn-fwd">W</div>
+                <div class="dpad-btn dpad-down" id="btn-back">S</div>
+                <div class="dpad-btn dpad-left" id="btn-left">A</div>
+                <div class="dpad-btn dpad-right" id="btn-right">D</div>
+            </div>
+            <div class="action-btns">
+                <div class="act-btn" id="btn-run">RUN</div>
+                <div class="act-btn" id="btn-act">INTERACT</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Rotate Hint Overlay -->
+    <div id="rotate-hint">সেরা অভিজ্ঞতার জন্য আপনার ফোনটি রোটেট (Landscape) করুন</div>
+
+    <script>
+        // --- System & PWA Setup ---
+        let selectedTrack = 'business';
+
+        function openSelection() {
+            document.getElementById('landing-screen').classList.add('hidden');
+            document.getElementById('select-screen').classList.remove('hidden');
+        }
+
+        function selectTrack(element, track) {
+            document.querySelectorAll('.card').forEach(c => c.classList.remove('selected'));
+            element.classList.add('selected');
+            selectedTrack = track;
+        }
+
+        function downloadApp() {
+            alert("গেমের WebApp (PWA) ফোনে ইনস্টল হওয়ার প্রসেস শুরু হয়েছে। আপনার হোমস্ক্রিনে শর্টকাট যুক্ত হবে।");
+        }
+
+        function startGame() {
+            document.getElementById('select-screen').classList.add('hidden');
+            document.getElementById('game-hud').classList.remove('hidden');
+            init3DWorld();
+        }
+
+        // --- 3D Open World Game Logic (Three.js) ---
+        let scene, camera, renderer;
+        let player, playerBody;
+        let moveState = { fwd: false, back: false, left: false, right: false, run: false };
+
+        function init3DWorld() {
+            // Scene Setup
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x87ceeb); // Sky color
+            scene.fog = new THREE.FogExp2(0x87ceeb, 0.015);
+
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            document.body.appendChild(renderer.domElement);
+
+            // Light
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
+
+            const sun = new THREE.DirectionalLight(0xffffff, 0.8);
+            sun.position.set(50, 100, 50);
+            sun.castShadow = true;
+            scene.add(sun);
+
+            // Ground (Roads & Grass)
+            const groundGeo = new THREE.PlaneGeometry(300, 300);
+            const groundMat = new THREE.MeshLambertMaterial({ color: 0x2e8b57 });
+            const ground = new THREE.Mesh(groundGeo, groundMat);
+            ground.rotation.x = -Math.PI / 2;
+            scene.add(ground);
+
+            // Road Mesh
+            const roadGeo = new THREE.PlaneGeometry(20, 300);
+            const roadMat = new THREE.MeshLambertMaterial({ color: 0x333333 });
+            const road = new THREE.Mesh(roadGeo, roadMat);
+            road.rotation.x = -Math.PI / 2;
+            road.position.y = 0.01;
+            scene.add(road);
+
+            // Player 3D Character Proxy
+            player = new THREE.Group();
+            
+            // Body
+            const bodyGeo = new THREE.BoxGeometry(0.8, 1.4, 0.5);
+            const bodyMat = new THREE.MeshLambertMaterial({ color: 0x006a4e }); // BD Green Shirt
+            const body = new THREE.Mesh(bodyGeo, bodyMat);
+            body.position.y = 1.1;
+            player.add(body);
+
+            // Head
+            const headGeo = new THREE.SphereGeometry(0.3, 16, 16);
+            const headMat = new THREE.MeshLambertMaterial({ color: 0xffcc99 });
+            const head = new THREE.Mesh(headGeo, headMat);
+            head.position.y = 2.1;
+            player.add(head);
+
+            scene.add(player);
+            player.position.set(0, 0, 0);
+
+            // Build Environment (Buildings, Rickshaw, Bus)
+            buildBangladeshiCity();
+
+            // Set Camera position relative to Player
+            camera.position.set(0, 5, 8);
+
+            // Controls Setup
+            setupControls();
+
+            // Animation Loop
+            animate();
+        }
+
+        function buildBangladeshiCity() {
+            // Buildings (Shops, Libraries, Towers)
+            for(let i = -100; i <= 100; i += 30) {
+                if(Math.abs(i) < 15) continue;
+                
+                // Left Side Towers & Libraries
+                createBuilding(i, -20, 10 + Math.random()*20, 0x999999);
+                // Right Side Shops & Houses
+                createBuilding(i, 20, 8 + Math.random()*15, 0xd2b48c);
+            }
+
+            // Red Bus Model Proxy
+            createVehicle(5, 40, 0xff2222, "লাল বাস");
+
+            // Rickshaw Model Proxy
+            createVehicle(-5, -20, 0x00ffcc, "রিকশা");
+        }
+
+        function createBuilding(z, x, height, color) {
+            const bGeo = new THREE.BoxGeometry(15, height, 15);
+            const bMat = new THREE.MeshLambertMaterial({ color: color });
+            const b = new THREE.Mesh(bGeo, bMat);
+            b.position.set(x, height/2, z);
+            scene.add(b);
+        }
+
+        function createVehicle(x, z, color, type) {
+            const vGeo = new THREE.BoxGeometry(2.5, 2, 5);
+            const vMat = new THREE.MeshLambertMaterial({ color: color });
+            const v = new THREE.Mesh(vGeo, vMat);
+            v.position.set(x, 1, z);
+            scene.add(v);
+        }
+
+        function setupControls() {
+            // Keyboard Listener
+            window.addEventListener('keydown', (e) => {
+                if(e.key === 'w' || e.key === 'ArrowUp') moveState.fwd = true;
+                if(e.key === 's' || e.key === 'ArrowDown') moveState.back = true;
+                if(e.key === 'a' || e.key === 'ArrowLeft') moveState.left = true;
+                if(e.key === 'd' || e.key === 'ArrowRight') moveState.right = true;
+                if(e.key === 'Shift') moveState.run = true;
+            });
+
+            window.addEventListener('keyup', (e) => {
+                if(e.key === 'w' || e.key === 'ArrowUp') moveState.fwd = false;
+                if(e.key === 's' || e.key === 'ArrowDown') moveState.back = false;
+                if(e.key === 'a' || e.key === 'ArrowLeft') moveState.left = false;
+                if(e.key === 'd' || e.key === 'ArrowRight') moveState.right = false;
+                if(e.key === 'Shift') moveState.run = false;
+            });
+
+            // Touch Controls Integration
+            const bindTouch = (id, key) => {
+                const el = document.getElementById(id);
+                el.addEventListener('touchstart', (e) => { e.preventDefault(); moveState[key] = true; });
+                el.addEventListener('touchend', (e) => { e.preventDefault(); moveState[key] = false; });
+            };
+
+            bindTouch('btn-fwd', 'fwd');
+            bindTouch('btn-back', 'back');
+            bindTouch('btn-left', 'left');
+            bindTouch('btn-right', 'right');
+            bindTouch('btn-run', 'run');
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // Movement logic
+            const speed = moveState.run ? 0.25 : 0.12;
+
+            if (moveState.fwd) player.position.z -= speed;
+            if (moveState.back) player.position.z += speed;
+            if (moveState.left) player.position.x -= speed;
+            if (moveState.right) player.position.x += speed;
+
+            // Camera follow player smoothly
+            camera.position.x = player.position.x;
+            camera.position.z = player.position.z + 8;
+            camera.position.y = player.position.y + 5;
+            camera.lookAt(player.position);
+
+            // Update MiniMap
+            const mapDot = document.getElementById('minimap-player');
+            mapDot.style.left = (48 + player.position.x / 3) + 'px';
+            mapDot.style.top = (48 + player.position.z / 3) + 'px';
+
+            renderer.render(scene, camera);
+        }
+
+        window.addEventListener('resize', () => {
+            if(camera && renderer) {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            }
+        });
+    </script>
+</body>
+  </html>
